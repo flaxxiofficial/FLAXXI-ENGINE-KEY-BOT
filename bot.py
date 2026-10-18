@@ -12,11 +12,6 @@ bot = telebot.TeleBot(TOKEN)
 OWNER_ID = 6903735098
 FIREBASE_URL = "https://flaxxi-23171-default-rtdb.firebaseio.com"
 
-# Random Key Generator Function (AimAi hata diya gaya hai)
-def generate_key(prefix="FLAXXI"):
-    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"{prefix}-{suffix}"
-
 # --- /start COMMAND (Deep Link Handler) ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -24,23 +19,46 @@ def send_welcome(message):
     
     # Jab user ad complete karke wapas aayega
     if len(args) > 1 and args[1] == "verify_claimkey":
-        key = generate_key()
-        
-        # Firebase Database mein key save karein
-        data = {"key": key, "status": "ACTIVE"}
         try:
-            requests.post(f"{FIREBASE_URL}/keys.json", json=data)
+            # Firebase se saari keys fetch karein
+            response = requests.get(f"{FIREBASE_URL}/keys.json")
+            keys_data = response.json()
+            
+            assigned_key = None
+            key_firebase_id = None
+            
+            if keys_data:
+                # Aisi key dhundhein jo ACTIVE ho aur abhi tak kisi ko di na gayi ho (claimed != True)
+                for k_id, item in keys_data.items():
+                    if isinstance(item, dict):
+                        if item.get("status") == "ACTIVE" and not item.get("claimed", False):
+                            assigned_key = item.get("key")
+                            key_firebase_id = k_id
+                            break
+            
+            if assigned_key and key_firebase_id:
+                # Us key ko Firebase mein 'claimed: True' mark kar dein taaki dobara kisi aur ko na mile
+                requests.patch(
+                    f"{FIREBASE_URL}/keys/{key_firebase_id}.json",
+                    json={"claimed": True, "status": "USED"}
+                )
+                
+                bot.send_message(
+                    message.chat.id,
+                    f"🎉 **Verification Successful!**\n\n"
+                    f"🔑 **Your Key:**\n`{assigned_key}`\n\n"
+                    f"⏳ **Validity:** 24 Hours\n"
+                    f"⚡ **FLAXXI ENGINE**",
+                    parse_mode="Markdown"
+                )
+            else:
+                bot.send_message(
+                    message.chat.id,
+                    "❌ **Sorry! No active keys available right now.**\nPlease try again later or contact the owner.",
+                    parse_mode="Markdown"
+                )
         except Exception as e:
-            print("Firebase Error:", e)
-        
-        bot.send_message(
-            message.chat.id,
-            f"🎉 **Verification Successful!**\n\n"
-            f"🔑 **Your Key:**\n`{key}`\n\n"
-            f"⏳ **Validity:** 24 Hours\n"
-            f"⚡ **FLAXXI ENGINE**",
-            parse_mode="Markdown"
-        )
+            bot.send_message(message.chat.id, f"❌ Error: {e}")
         return
 
     # Normal /start message with Ad link
@@ -86,20 +104,14 @@ def callback_query(call):
     if call.data == "admin_add_key":
         if call.from_user.id != OWNER_ID:
             return
-        new_key = generate_key(prefix="FLAXXI-VIP")
         
-        # Firebase mein VIP key save karein
-        data = {"key": new_key, "status": "ACTIVE"}
-        try:
-            requests.post(f"{FIREBASE_URL}/keys.json", json=data)
-        except Exception as e:
-            print("Firebase Error:", e)
-            
-        bot.send_message(
+        msg = bot.send_message(
             call.message.chat.id,
-            f"✅ **VIP Key Created & Saved to Firebase!**\n\n🔑 `{new_key}`",
+            "✍️ **Please send the key you want to add** (e.g., `FLAXXI-VIP-001` or `FLAXXI VIP V002`):",
             parse_mode="Markdown"
         )
+        # Agla message jo owner bhejega, use key ki tarah save karne ke liye register karein
+        bot.register_next_step_handler(msg, save_custom_key)
         
     elif call.data == "admin_view_keys":
         if call.from_user.id != OWNER_ID:
@@ -110,13 +122,40 @@ def callback_query(call):
             if not keys_data:
                 bot.send_message(call.message.chat.id, "📋 **No keys found in Firebase.**", parse_mode="Markdown")
             else:
-                msg = "📋 **Firebase Active Keys:**\n\n"
+                msg = "📋 **Firebase Keys List:**\n\n"
                 for k_id, item in keys_data.items():
                     if isinstance(item, dict):
-                        msg += f"• `{item.get('key')}`\n"
+                        k_val = item.get('key')
+                        k_status = item.get('status', 'ACTIVE')
+                        claimed_status = "🔴 Used" if item.get('claimed') else "🟢 Active"
+                        msg += f"• `{k_val}` | {claimed_status}\n"
                 bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
         except Exception as e:
             bot.send_message(call.message.chat.id, f"❌ Error fetching keys: {e}")
+
+# --- SAVE CUSTOM KEY FUNCTION ---
+def save_custom_key(message):
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    custom_key = message.text.strip()
+    
+    # Firebase mein custom key save karein (claimed: False rakhenge taaki user ko mil sake)
+    data = {
+        "key": custom_key,
+        "status": "ACTIVE",
+        "claimed": False
+    }
+    
+    try:
+        requests.post(f"{FIREBASE_URL}/keys.json", json=data)
+        bot.send_message(
+            message.chat.id,
+            f"✅ **Key Successfully Saved to Firebase!**\n\n🔑 `{custom_key}`",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Failed to save key: {e}")
 
 # Bot ko run rakhne ke liye
 bot.infinity_polling()
