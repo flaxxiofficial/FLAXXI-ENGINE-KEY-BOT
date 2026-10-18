@@ -20,7 +20,7 @@ def send_welcome(message):
     # Jab user ad complete karke wapas aayega (deep link ke through)
     if len(args) > 1 and args[1] == "verify_claimkey":
         try:
-            # Firebase se saari keys fetch karein (Timeout=10 added to prevent freezing)[span_1](start_span)[span_1](end_span)
+            # Firebase se saari keys fetch karein (Timeout=10 to prevent freezing)
             response = requests.get(f"{FIREBASE_URL}/keys.json", timeout=10)
             keys_data = response.json()
             
@@ -32,13 +32,14 @@ def send_welcome(message):
                 
                 for k_id, item in items:
                     if isinstance(item, dict):
+                        # Jo key active ho aur kisi ko na di gayi ho
                         if item.get("status") == "ACTIVE" and not item.get("claimed", False):
                             assigned_key = item.get("key")
                             key_firebase_id = k_id
                             break
             
             if assigned_key and key_firebase_id:
-                # Us key ko Firebase mein 'claimed: True' mark kar dein taaki dobara kisi aur ko na mile
+                # Us key ko Firebase mein 'claimed: True' mark karein
                 requests.patch(
                     f"{FIREBASE_URL}/keys/{key_firebase_id}.json",
                     json={"claimed": True, "status": "USED"},
@@ -91,7 +92,8 @@ def owner_panel(message):
     markup.row_width = 2
     markup.add(
         InlineKeyboardButton("➕ Add / Create Key", callback_data="admin_add_key"),
-        InlineKeyboardButton("📋 View All Keys", callback_data="admin_view_keys")
+        InlineKeyboardButton("📋 View All Keys", callback_data="admin_view_keys"),
+        InlineKeyboardButton("🗑️ Remove Key", callback_data="admin_remove_key")
     )
     
     bot.send_message(
@@ -100,6 +102,20 @@ def owner_panel(message):
         reply_markup=markup,
         parse_mode="Markdown"
     )
+
+# --- /remove COMMAND ---
+@bot.message_handler(commands=['remove'])
+def remove_command(message):
+    if message.from_user.id != OWNER_ID:
+        bot.reply_to(message, "❌ **You are not authorized.**", parse_mode="Markdown")
+        return
+
+    msg = bot.send_message(
+        message.chat.id,
+        "🗑️ **Enter the key you want to remove:**",
+        parse_mode="Markdown"
+    )
+    bot.register_next_step_handler(msg, delete_key_from_firebase)
 
 # --- CALLBACK QUERY HANDLER ---
 @bot.callback_query_handler(func=lambda call: True)
@@ -135,6 +151,17 @@ def callback_query(call):
         except Exception as e:
             bot.send_message(call.message.chat.id, f"❌ Error fetching keys: {e}")
 
+    elif call.data == "admin_remove_key":
+        if call.from_user.id != OWNER_ID:
+            return
+        
+        msg = bot.send_message(
+            call.message.chat.id,
+            "🗑️ **Enter the key you want to remove:**",
+            parse_mode="Markdown"
+        )
+        bot.register_next_step_handler(msg, delete_key_from_firebase)
+
 # --- SAVE CUSTOM KEY FUNCTION ---
 def save_custom_key(message):
     if message.from_user.id != OWNER_ID:
@@ -157,6 +184,41 @@ def save_custom_key(message):
         )
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Failed to save key: {e}")
+
+# --- DELETE KEY FROM FIREBASE FUNCTION ---
+def delete_key_from_firebase(message):
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    target_key = message.text.strip()
+    
+    try:
+        response = requests.get(f"{FIREBASE_URL}/keys.json", timeout=10)
+        keys_data = response.json()
+        
+        found = False
+        if keys_data and isinstance(keys_data, dict):
+            for k_id, item in keys_data.items():
+                if isinstance(item, dict) and item.get("key") == target_key:
+                    # Delete the key matching the input
+                    requests.delete(f"{FIREBASE_URL}/keys/{k_id}.json", timeout=10)
+                    found = True
+                    break
+                    
+        if found:
+            bot.send_message(
+                message.chat.id,
+                f"🗑️ **Key removed successfully!**\n\n🔑 `{target_key}`",
+                parse_mode="Markdown"
+            )
+        else:
+            bot.send_message(
+                message.chat.id,
+                f"❌ **Key not found in Firebase database:**\n`{target_key}`",
+                parse_mode="Markdown"
+            )
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Error removing key: {e}")
 
 # Bot ko run rakhne ke liye
 bot.infinity_polling()
