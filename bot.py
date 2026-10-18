@@ -1,24 +1,43 @@
 import telebot
 import requests
+import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Bot Token
+# Bot Token & Configuration
 TOKEN = "8868351923:AAHK25ihjj6D40xnzpHm16OHuFonQJnUhzI"
 bot = telebot.TeleBot(TOKEN)
 
-# Owner ID & Firebase URL
 OWNER_ID = 6903735098
 FIREBASE_URL = "https://flaxxi-23171-default-rtdb.firebaseio.com"
 
-# --- /start COMMAND (Deep Link Handler) ---
+# --- /start COMMAND (Protected & Deep Link Handler) ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     try:
         args = message.text.split()
+        user_id = message.chat.id
         
         # Jab user ad complete karke wapas aayega
         if len(args) > 1 and args[1] == "verify_claimkey":
             try:
+                # 1. Bot Protection: Check if user already claimed a key recently (24-hour cooldown)
+                user_res = requests.get(f"{FIREBASE_URL}/users/{user_id}.json", timeout=5)
+                user_data = user_res.json()
+                
+                current_time = time.time()
+                if user_data and isinstance(user_data, dict):
+                    last_claimed = user_data.get("last_claimed", 0)
+                    # 86400 seconds = 24 Hours cooldown
+                    if current_time - last_claimed < 86400:
+                        remaining_hours = int((86400 - (current_time - last_claimed)) / 3600)
+                        bot.send_message(
+                            user_id,
+                            f"⚠️ **Protection Alert!**\n\nYou have already claimed a key recently.\n⏳ Please wait another **{remaining_hours} hours** before claiming a new one.",
+                            parse_mode="Markdown"
+                        )
+                        return
+
+                # 2. Fetch Active Keys from Firebase
                 response = requests.get(f"{FIREBASE_URL}/keys.json", timeout=5)
                 keys_data = response.json()
                 
@@ -34,14 +53,22 @@ def send_welcome(message):
                                 break
                 
                 if assigned_key and key_firebase_id:
+                    # Mark key as used
                     requests.patch(
                         f"{FIREBASE_URL}/keys/{key_firebase_id}.json",
                         json={"claimed": True, "status": "USED"},
                         timeout=5
                     )
                     
+                    # Save user claim timestamp for protection
+                    requests.put(
+                        f"{FIREBASE_URL}/users/{user_id}.json",
+                        json={"last_claimed": current_time, "key": assigned_key},
+                        timeout=5
+                    )
+                    
                     bot.send_message(
-                        message.chat.id,
+                        user_id,
                         f"🎉 **Verification Successful!**\n\n"
                         f"🔑 **Your Key:**\n`{assigned_key}`\n\n"
                         f"⏳ **Validity:** 24 Hours\n"
@@ -50,13 +77,13 @@ def send_welcome(message):
                     )
                 else:
                     bot.send_message(
-                        message.chat.id,
-                        "❌ **Sorry! No active keys available right now.**\nPlease ask the owner to add more keys.",
+                        user_id,
+                        "❌ **Sorry! No active keys available right now.**\nPlease ask the owner to add more keys in the admin panel.",
                         parse_mode="Markdown"
                     )
             except Exception as ex:
-                print("Firebase Error:", ex)
-                bot.send_message(message.chat.id, "❌ Server connection error. Please try again.")
+                print("Verification Error:", ex)
+                bot.send_message(user_id, "❌ Server connection error. Please try again.")
             return
 
         # Normal /start message with Ad link
@@ -67,7 +94,7 @@ def send_welcome(message):
             "🛡️ **Human Verification Required**\n\n"
             "Please watch the sponsored ad below to verify and get your key."
         )
-        bot.send_message(message.chat.id, welcome_text, reply_markup=markup, parse_mode="Markdown")
+        bot.send_message(user_id, welcome_text, reply_markup=markup, parse_mode="Markdown")
     except Exception as e:
         print("Start Error:", e)
 
@@ -214,5 +241,5 @@ def delete_key_from_firebase(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Error removing key: {e}")
 
-# Bot ko fast aur non-freezing run rakhne ke liye safe polling
+# Non-freezing safe polling
 bot.infinity_polling(timeout=60, long_polling_timeout=30)
