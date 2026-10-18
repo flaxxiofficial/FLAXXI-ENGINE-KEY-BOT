@@ -1,9 +1,29 @@
 import telebot
 import requests
 import time
+import threading
+import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Bot Token & Configuration
+# --- RENDER WEB PORT KEEP-ALIVE SERVER ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"FLAXXI ENGINE Bot is Alive!")
+    def log_message(self, format, *args):
+        return # Logs ko clean rakhne ke liye
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    server.serve_forever()
+
+# Start HTTP server in a background thread so Render deployment never fails
+threading.Thread(target=run_http_server, daemon=True).start()
+
+# --- BOT CONFIGURATION ---
 TOKEN = "8868351923:AAHK25ihjj6D40xnzpHm16OHuFonQJnUhzI"
 bot = telebot.TeleBot(TOKEN)
 
@@ -27,7 +47,6 @@ def send_welcome(message):
                 current_time = time.time()
                 if user_data and isinstance(user_data, dict):
                     last_claimed = user_data.get("last_claimed", 0)
-                    # 86400 seconds = 24 Hours cooldown
                     if current_time - last_claimed < 86400:
                         remaining_hours = int((86400 - (current_time - last_claimed)) / 3600)
                         bot.send_message(
