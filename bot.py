@@ -22,7 +22,7 @@ def run_http_server():
 
 threading.Thread(target=run_http_server, daemon=True).start()
 
-# --- BOT CONFIGURATION (NEW TOKEN) ---
+# --- BOT CONFIGURATION ---
 TOKEN = "8868351923:AAFHkJI1jwJoGenUDmWKNlOw9qvrtvgCkMk"
 bot = telebot.TeleBot(TOKEN)
 
@@ -49,7 +49,7 @@ def send_welcome(message):
                         remaining_hours = int((86400 - (current_time - last_claimed)) / 3600)
                         bot.send_message(
                             user_id,
-                            f"⚠️ **Protection Alert!**\n\nYou have already claimed a key recently.\n⏳ Please wait another **{remaining_hours} hours** before claiming a new one.",
+                            f"⚠️ *Protection Alert!*\n\nYou have already claimed a key recently.\n⏳ Please wait another *{remaining_hours} hours* before claiming a new one.",
                             parse_mode="Markdown"
                         )
                         return
@@ -83,16 +83,16 @@ def send_welcome(message):
                     
                     bot.send_message(
                         user_id,
-                        f"🎉 **Verification Successful!**\n\n"
-                        f"🔑 **Your Key:**\n`{assigned_key}`\n\n"
-                        f"⏳ **Validity:** 24 Hours\n"
-                        f"⚡ **FLAXXI ENGINE**",
+                        f"🎉 *Verification Successful!*\n\n"
+                        f"🔑 *Your Key:*\n`{assigned_key}`\n\n"
+                        f"⏳ *Validity:* 24 Hours\n"
+                        f"⚡ *FLAXXI ENGINE*",
                         parse_mode="Markdown"
                     )
                 else:
                     bot.send_message(
                         user_id,
-                        "❌ **Sorry! No active keys available right now.**\nPlease ask the owner to add more keys.",
+                        "❌ *Sorry! No active keys available right now.*\nPlease ask the owner to add more keys.",
                         parse_mode="Markdown"
                     )
             except Exception as ex:
@@ -104,7 +104,7 @@ def send_welcome(message):
         markup.add(InlineKeyboardButton("Verify ✅", url="https://srnky.com/EGLiVw1ME"))
         
         welcome_text = (
-            "🛡️ **Human Verification Required**\n\n"
+            "🛡️ *Human Verification Required*\n\n"
             "Please watch the sponsored ad below to verify and get your key."
         )
         bot.send_message(user_id, welcome_text, reply_markup=markup, parse_mode="Markdown")
@@ -116,7 +116,7 @@ def send_welcome(message):
 def owner_panel(message):
     try:
         if message.from_user.id != OWNER_ID:
-            bot.reply_to(message, "❌ **You are not authorized.**", parse_mode="Markdown")
+            bot.reply_to(message, "❌ *You are not authorized.*", parse_mode="Markdown")
             return
 
         markup = InlineKeyboardMarkup(row_width=2)
@@ -128,7 +128,7 @@ def owner_panel(message):
         
         bot.send_message(
             message.chat.id,
-            "👑 **FLAXXI ENGINE - DPAdmin Panel**\n\nChoose an option:",
+            "👑 *FLAXXI ENGINE - DPAdmin Panel*\n\nChoose an option:",
             reply_markup=markup,
             parse_mode="Markdown"
         )
@@ -140,12 +140,12 @@ def owner_panel(message):
 def remove_command(message):
     try:
         if message.from_user.id != OWNER_ID:
-            bot.reply_to(message, "❌ **You are not authorized.**", parse_mode="Markdown")
+            bot.reply_to(message, "❌ *You are not authorized.*", parse_mode="Markdown")
             return
 
         msg = bot.send_message(
             message.chat.id,
-            "🗑️ **Enter the key you want to remove:**",
+            "🗑️ *Enter the key you want to remove:*",
             parse_mode="Markdown"
         )
         bot.register_next_step_handler(msg, delete_key_from_firebase)
@@ -162,7 +162,7 @@ def callback_query(call):
             
             msg = bot.send_message(
                 call.message.chat.id,
-                "✍️ **Please send the key you want to add:**",
+                "✍️ *Please send the key you want to add:*",
                 parse_mode="Markdown"
             )
             bot.register_next_step_handler(msg, save_custom_key)
@@ -174,9 +174,9 @@ def callback_query(call):
                 response = requests.get(f"{FIREBASE_URL}/keys.json", timeout=5)
                 keys_data = response.json()
                 if not keys_data or not isinstance(keys_data, dict):
-                    bot.send_message(call.message.chat.id, "📋 **No keys found in Firebase.**", parse_mode="Markdown")
+                    bot.send_message(call.message.chat.id, "📋 *No keys found in Firebase.*", parse_mode="Markdown")
                 else:
-                    msg = "📋 **Firebase Keys List:**\n\n"
+                    msg = "📋 *Firebase Keys List:*\n\n"
                     for k_id, item in keys_data.items():
                         if isinstance(item, dict):
                             k_val = item.get('key')
@@ -192,7 +192,7 @@ def callback_query(call):
             
             msg = bot.send_message(
                 call.message.chat.id,
-                "🗑️ **Enter the key you want to remove:**",
+                "🗑️ *Enter the key you want to remove:*",
                 parse_mode="Markdown"
             )
             bot.register_next_step_handler(msg, delete_key_from_firebase)
@@ -215,7 +215,7 @@ def save_custom_key(message):
         requests.post(f"{FIREBASE_URL}/keys.json", json=data, timeout=5)
         bot.send_message(
             message.chat.id,
-            f"✅ **Key Successfully Saved to Firebase!**\n\n🔑 `{custom_key}`",
+            f"✅ *Key Successfully Saved to Firebase!*\n\n🔑 `{custom_key}`",
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -242,19 +242,19 @@ def delete_key_from_firebase(message):
         if found:
             bot.send_message(
                 message.chat.id,
-                f"🗑️ **Key removed successfully!**\n\n🔑 `{target_key}`",
+                f"🗑️ *Key removed successfully!*\n\n🔑 `{target_key}`",
                 parse_mode="Markdown"
             )
         else:
             bot.send_message(
                 message.chat.id,
-                f"❌ **Key not found in database:**\n`{target_key}`",
+                f"❌ *Key not found in database:*\n`{target_key}`",
                 parse_mode="Markdown"
             )
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Error removing key: {e}")
 
-# Clear webhook and start polling
+# Clear webhook and start polling safely
 try:
     bot.remove_webhook()
 except Exception as e:
