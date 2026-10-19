@@ -254,10 +254,12 @@ def delete_key_from_firebase(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Error removing key: {e}")
 
-# Clear webhook and start polling safely
+# Clear webhook completely and drop pending stuck updates
 try:
-    bot.remove_webhook()
+    bot.delete_webhook(drop_pending_updates=True)
+    print("Webhook cleared successfully!")
 except Exception as e:
-    print("Webhook removal notice:", e)
+    print("Webhook deletion notice:", e)
 
+print("Bot is starting polling...")
 bot.infinity_polling(timeout=60, long_polling_timeout=30)
