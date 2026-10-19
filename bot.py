@@ -22,8 +22,8 @@ def run_http_server():
 
 threading.Thread(target=run_http_server, daemon=True).start()
 
-# --- BOT CONFIGURATION ---
-TOKEN = "8868351923:AAHK25ihjj6D40xnzpHm16OHuFonQJnUhzI"
+# --- BOT CONFIGURATION (NEW TOKEN) ---
+TOKEN = "8868351923:AAFhKJI1jwJoGenUDmWKNlOw9qvrtvgCkMk"
 bot = telebot.TeleBot(TOKEN)
 
 OWNER_ID = 6903735098
@@ -38,7 +38,7 @@ def send_welcome(message):
         
         if len(args) > 1 and args[1] == "verify_claimkey":
             try:
-                # 24-hour cooldown check
+                # 24-hour cooldown check (Bot Protection)
                 user_res = requests.get(f"{FIREBASE_URL}/users/{user_id}.json", timeout=5)
                 user_data = user_res.json()
                 
@@ -254,6 +254,6 @@ def delete_key_from_firebase(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Error removing key: {e}")
 
-# Remove any old ghost webhook and start clean polling
+# Clear old webhooks and start polling
 bot.remove_webhook()
 bot.infinity_polling(timeout=60, long_polling_timeout=30)
