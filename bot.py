@@ -13,14 +13,13 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"FLAXXI ENGINE Bot is Alive!")
     def log_message(self, format, *args):
-        return # Logs ko clean rakhne ke liye
+        return
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# Start HTTP server in a background thread so Render deployment never fails
 threading.Thread(target=run_http_server, daemon=True).start()
 
 # --- BOT CONFIGURATION ---
@@ -30,17 +29,16 @@ bot = telebot.TeleBot(TOKEN)
 OWNER_ID = 6903735098
 FIREBASE_URL = "https://flaxxi-23171-default-rtdb.firebaseio.com"
 
-# --- /start COMMAND (Protected & Deep Link Handler) ---
+# --- /start COMMAND ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     try:
         args = message.text.split()
         user_id = message.chat.id
         
-        # Jab user ad complete karke wapas aayega
         if len(args) > 1 and args[1] == "verify_claimkey":
             try:
-                # 1. Bot Protection: Check if user already claimed a key recently (24-hour cooldown)
+                # 24-hour cooldown check
                 user_res = requests.get(f"{FIREBASE_URL}/users/{user_id}.json", timeout=5)
                 user_data = user_res.json()
                 
@@ -56,7 +54,6 @@ def send_welcome(message):
                         )
                         return
 
-                # 2. Fetch Active Keys from Firebase
                 response = requests.get(f"{FIREBASE_URL}/keys.json", timeout=5)
                 keys_data = response.json()
                 
@@ -72,14 +69,12 @@ def send_welcome(message):
                                 break
                 
                 if assigned_key and key_firebase_id:
-                    # Mark key as used
                     requests.patch(
                         f"{FIREBASE_URL}/keys/{key_firebase_id}.json",
                         json={"claimed": True, "status": "USED"},
                         timeout=5
                     )
                     
-                    # Save user claim timestamp for protection
                     requests.put(
                         f"{FIREBASE_URL}/users/{user_id}.json",
                         json={"last_claimed": current_time, "key": assigned_key},
@@ -97,7 +92,7 @@ def send_welcome(message):
                 else:
                     bot.send_message(
                         user_id,
-                        "❌ **Sorry! No active keys available right now.**\nPlease ask the owner to add more keys in the admin panel.",
+                        "❌ **Sorry! No active keys available right now.**\nPlease ask the owner to add more keys.",
                         parse_mode="Markdown"
                     )
             except Exception as ex:
@@ -105,7 +100,6 @@ def send_welcome(message):
                 bot.send_message(user_id, "❌ Server connection error. Please try again.")
             return
 
-        # Normal /start message with Ad link
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("Verify ✅", url="https://srnky.com/EGLiVw1ME"))
         
