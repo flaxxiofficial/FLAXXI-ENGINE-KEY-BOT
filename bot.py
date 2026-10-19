@@ -254,5 +254,6 @@ def delete_key_from_firebase(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Error removing key: {e}")
 
-# Non-freezing safe polling
+# Remove any old ghost webhook and start clean polling
+bot.remove_webhook()
 bot.infinity_polling(timeout=60, long_polling_timeout=30)
